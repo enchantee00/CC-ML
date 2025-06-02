@@ -1,4 +1,4 @@
-def vllm_response(query, context):
+def llm_prompt(query, context):
     # LLM에 넣을 프롬프트
     prompt = f"""다음은 가전제품 사용설명서의 일부입니다:
 

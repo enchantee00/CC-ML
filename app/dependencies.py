@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+import chromadb
 
 from inference import ModelManager
 
@@ -10,8 +11,11 @@ from inference import ModelManager
 @asynccontextmanager
 async def lifespan(app: FastAPI):    
     model_manager = ModelManager()
+    client = chromadb.PersistentClient(path="./chroma_db")
+
     app.state.model_manager = model_manager
-    
+    app.state.chroma_client = client
+
     yield  # 애플리케이션 실행
 
     del model_manager
@@ -20,5 +24,6 @@ async def lifespan(app: FastAPI):
 
 def get_dependencies(request: Request):
     return {
-        "model_manager": request.app.state.model_manager
+        "model_manager": request.app.state.model_manager,
+        "chroma_client": request.app.state.chroma_client
     }

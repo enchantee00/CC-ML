@@ -1,15 +1,18 @@
 import os
-import uvicorn
+import numpy as np
 from fastapi import FastAPI
-
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from dependencies import lifespan
 from routers import router
 
-app = FastAPI(lifespan=lifespan)
+# 환경 변수
+os.environ["MKL_THREADING_LAYER"] = "GNU"
 
-# 라우터 등록
+app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import multiprocessing as mp
+    mp.set_start_method("spawn", force=True)
+
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)  

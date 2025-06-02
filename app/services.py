@@ -1,18 +1,30 @@
 import time
-
-from fastapi import HTTPException
-from langchain.schema import HumanMessage
-
-from prompt import *
-from schemas import QuestionRequest
-from config import UPSTAGE_API_KEY, UPSTAGE_API_URL
-import requests
+import os
 import json
+import asyncio
+import requests
+from typing import Tuple, List
+
+from fastapi import HTTPException, UploadFile
+from dotenv import load_dotenv
+
+from schemas import QuestionRequest
+from config import DATA_DIR
+from utils import chunk_by_heading1, get_base64_by_id
+from prompt import llm_prompt
+
+load_dotenv()
+UPSTAGE_API_KEY = os.environ.get("UPSTAGE_API_KEY")
+UPSTAGE_API_URL = os.environ.get("UPSTAGE_API_URL")
 
 
-def process_pdf(file, filename: str):
+def get_data_file_path(doc_name: str) -> str:
+    return os.path.join(DATA_DIR, f"{doc_name}.json")
+
+
+def process_pdf(doc_name: str, file: UploadFile, chroma_client, model_manager) -> None:
     files = {
-        "document": (filename, file.file, file.content_type)
+        "document": (file.filename, file.file, file.content_type)
     }
     data = {
         "ocr": "force",
@@ -23,52 +35,77 @@ def process_pdf(file, filename: str):
         "Authorization": f"Bearer {UPSTAGE_API_KEY}"
     }
 
-    response = requests.post(UPSTAGE_API_URL, headers=headers, files=files, data=data)
+    try:
+        response = requests.post(UPSTAGE_API_URL, headers=headers, files=files, data=data)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Upstage API Error: {str(e)}")
+    
+    response_data = response.json()
 
-    with open("filename.json", "w", encoding="utf-8") as f:
-        json.dump(response.json(), f, ensure_ascii=False, indent=4)
+    with open(get_data_file_path(doc_name), "w", encoding="utf-8") as f:
+        json.dump(response_data, f, ensure_ascii=False, indent=4)
+
+    chunks = chunk_by_heading1(response_data['elements'])
+
+    documents = []
+    metadatas = []
+    ids = []
+
+    for i, chunk in enumerate(chunks):
+        section = chunk["section_heading"]
+        for elem in chunk["elements"]:
+            doc_id = f"{i}_{elem['id']}"
+            doc = f"[그림: '{section}' 섹션에 해당하는 시각 자료입니다.]" if elem["category"] == "figure" else elem["text"]
+
+            documents.append(doc)
+            ids.append(doc_id)
+            metadatas.append({
+                "section": section,
+                "category": elem["category"],
+                "page": elem["page"],
+                "element_id": elem["id"]
+            })
+
+    collection = chroma_client.get_or_create_collection(doc_name)
+    embeddings = model_manager.sentence_model.encode(documents).tolist()
+
+    collection.add(
+        documents=documents,
+        embeddings=embeddings,
+        metadatas=metadatas,
+        ids=ids
+    )
 
 
-def ask_llm(request: QuestionRequest, model_manager):
-    start_time = time.time()  # 시작 시간 기록
+async def get_llm_answer(request: QuestionRequest, chroma_client, model_manager) -> Tuple[str, List[str]]:
+    start_time = time.time()
 
-    question = request.question
+    doc_name = request.doc_name
+    query = request.question
 
+    collection = chroma_client.get_or_create_collection(doc_name)
+    query_embedding = await asyncio.to_thread(model_manager.sentence_model.encode, [query])
+    query_embedding = query_embedding[0].tolist()
 
-    # 해당 카테고리의 FAISS DB 로드
-    db_path = FAISS_DB_PATHS[category]
-    db, retriever = model_manager.load_faiss_db(db_path)
-    retrieved_docs = retriever.get_relevant_documents(question)
-    retrieved_text = "\n".join([doc.page_content for doc in retrieved_docs])
-    end_time = time.time()
-    processing_time = round(end_time - start_time, 2)
-    print(f"~faiss: {processing_time}")
+    results = collection.query(query_embeddings=[query_embedding], n_results=10)
+    context = "\n\n".join(results['documents'][0])
+    prompt = llm_prompt(query, context)
 
-    title_prompt = vllm_llama_title()
-    # response_prompt = vllm_llama_response()
-    response_prompt = vllm_llama_response_without_history()
+    answer = await asyncio.to_thread(model_manager.generate_response, prompt)
 
+    try:
+        with open(get_data_file_path(doc_name), "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document data not found.")
 
-    # title, answer = await asyncio.gather(
-    #     generate_title(session_id, title_prompt, question, sampling_params),
-    #     generate_response(response_prompt, history_text, retrieved_text, question, sampling_params)
-    # )
+    images = [
+        get_base64_by_id(data["elements"], m["element_id"])
+        for m in results['metadatas'][0] if m["category"] == "figure"
+    ]
 
-    title = model_manager.generate_title(session_id, title_prompt, question), 
-    # answer = generate_response(response_prompt, history_text, retrieved_text, question, sampling_params)
-    answer = model_manager.generate_response_without_history(response_prompt, retrieved_text, question)
-
-
-    if isinstance(title, tuple):
-        title = title[0]
-
-    memory.save_context({"input": question}, {"output": answer})
-
-    # 처리 시간 계산
-    end_time = time.time()
-    processing_time = round(end_time - start_time, 2)  
+    processing_time = round(time.time() - start_time, 2)
     print(f"processing_time: {processing_time}")
 
-    return {
-        "answer": answer
-    }
+    return answer, images
