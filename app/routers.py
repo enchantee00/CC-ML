@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from dependencies import get_dependencies
-from schemas import QuestionRequest, DocNameRequest
+from schemas import QuestionRequest
 from services import *
 
 router = APIRouter()
