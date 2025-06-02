@@ -4,3 +4,4 @@ __pycache__/
 models/saved_models/
 models/lora_adapter/
 results
+.env
