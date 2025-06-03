@@ -3,6 +3,11 @@ import httpx
 import time
 import uuid
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+API_KEY = os.environ.get("API_KEY")
 
 questions = [
     "비스포크 제트 청소기의 충전 시간은 얼마나 걸리나요?",
@@ -21,7 +26,7 @@ API_URL = "http://0.0.0.0:8000/api/chat/manual"  # 👈 실제 주소로 바꾸�
 DOC_NAME = "bespoke"
 HEADERS = {
     "Content-Type": "application/json",
-    "x-api-key": "AKIA2HSMPZTDHD5NQQK5"  # 필요시
+    "x-api-key": API_KEY  # 필요시
 }
 
 LOG_FILE = "results_log.txt"
