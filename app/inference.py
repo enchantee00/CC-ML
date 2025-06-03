@@ -19,7 +19,7 @@ class ModelManager:
         # vLLM 초기화
         self.llm = LLM(model=LLM_MODEL_PATH, tensor_parallel_size=2, gpu_memory_utilization=0.8, max_model_len=1024)
 
-        device = torch.device("cuda:2")  # 원하는 GPU 번호로 설정
+        device = torch.device("cuda:3")  # 원하는 GPU 번호로 설정
         self.sentence_model = SentenceTransformer(EMBEDDING_MODEL_PATH, device=device)
 
 

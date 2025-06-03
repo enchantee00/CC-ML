@@ -5,15 +5,16 @@ from fastapi.responses import JSONResponse
 from dependencies import get_dependencies
 from schemas import QuestionRequest
 from services import *
+from utils import verify_api_key
 
 router = APIRouter()
 
 @router.get("/")
-def home():
+def home(api_key: str = Depends(verify_api_key)):
     return {"message": "Hello, World!"}
 
-@router.post("/documents")
-async def upload_pdf(doc_name: str = Form(...), file: UploadFile = File(...), dependencies: dict = Depends(get_dependencies)):
+@router.post("/api/manuals/upload")
+async def upload_pdf(doc_name: str = Form(...), file: UploadFile = File(...), dependencies: dict = Depends(get_dependencies), api_key: str = Depends(verify_api_key)):
     if file.content_type != "application/pdf":
         return JSONResponse(status_code=400, content={"error": "Only PDF files are allowed"})
     
@@ -21,12 +22,12 @@ async def upload_pdf(doc_name: str = Form(...), file: UploadFile = File(...), de
 
     return JSONResponse(
         status_code=200,  # 또는 201
-        content={"message": "PDF uploaded successfully", "filename": file.filename}
+        content={"message": "PDF uploaded successfully", "doc_name": doc_name}
     )
 
 
-@router.post("/ask")
-async def ask(request: QuestionRequest, dependencies: dict = Depends(get_dependencies)):
+@router.post("/api/chat/manual")
+async def ask(request: QuestionRequest, dependencies: dict = Depends(get_dependencies), api_key: str = Depends(verify_api_key)):
     answer, img_lst = await get_llm_answer(
         request,
         dependencies["chroma_client"],
