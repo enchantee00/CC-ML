@@ -12,6 +12,8 @@ from schemas import QuestionRequest
 from config import DATA_DIR
 from utils import chunk_by_heading1, get_base64_by_id
 from prompt import llm_prompt
+from inference import generate_response
+
 
 load_dotenv()
 UPSTAGE_API_KEY = os.environ.get("UPSTAGE_API_KEY")
@@ -85,14 +87,13 @@ async def get_llm_answer(request: QuestionRequest, chroma_client, model_manager)
     query = request.question
 
     collection = chroma_client.get_or_create_collection(doc_name)
-    query_embedding = await asyncio.to_thread(model_manager.sentence_model.encode, [query])
-    query_embedding = query_embedding[0].tolist()
+    query_embedding = model_manager.sentence_model.encode([query])[0].tolist()
 
     results = collection.query(query_embeddings=[query_embedding], n_results=10)
     context = "\n\n".join(results['documents'][0])
     prompt = llm_prompt(query, context)
 
-    answer = await asyncio.to_thread(model_manager.generate_response, prompt)
+    answer = await generate_response(prompt)
 
     try:
         with open(get_data_file_path(doc_name), "r", encoding="utf-8") as f:

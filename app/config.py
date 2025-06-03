@@ -1,5 +1,7 @@
 import os
 
+
+VLLM_API_URL = "http://localhost:8001/v1/completions"
 LLM_MODEL_PATH = "rtzr/ko-gemma-2-9b-it"
 EMBEDDING_MODEL_PATH = "nlpai-lab/KURE-v1"
 
