@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 import chromadb
 
 from inference import ModelManager
-
+from config import CHROMA_DIR
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -11,7 +11,7 @@ from inference import ModelManager
 @asynccontextmanager
 async def lifespan(app: FastAPI):    
     model_manager = ModelManager()
-    client = chromadb.PersistentClient(path="./chroma_db")
+    client = chromadb.PersistentClient(path=CHROMA_DIR)
 
     app.state.model_manager = model_manager
     app.state.chroma_client = client

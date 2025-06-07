@@ -24,7 +24,7 @@ async def upload_pdf(doc_name: str = Form(...), file: UploadFile = File(...), de
             doc_name,
             file,
             dependencies["chroma_client"],
-            dependencies["sentence_model"]
+            dependencies["model_manager"]
         )
 
         return JSONResponse(
