@@ -89,13 +89,17 @@ async def get_llm_answer(request: QuestionRequest, chroma_client, model_manager)
     collection = chroma_client.get_or_create_collection(doc_name)
     query_embedding = model_manager.sentence_model.encode([query])[0].tolist()
 
-    results = collection.query(query_embeddings=[query_embedding], n_results=10)
+    results = collection.query(query_embeddings=[query_embedding], n_results=5)
     context = "\n\n".join(results['documents'][0])
     prompt = llm_prompt(query, context)
 
     answer = await generate_response(prompt)
 
     try:
+        """
+        작은 파일이므로 blocking 함수 open 사용
+        만약 파일이 크다면, aiofiles 라이브러리(비동기 파일 입출력 기능) 사용 고려
+        """
         with open(get_data_file_path(doc_name), "r", encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:

@@ -10,7 +10,7 @@ from utils import verify_api_key
 router = APIRouter()
 
 @router.get("/")
-def home(api_key: str = Depends(verify_api_key)):
+async def home(api_key: str = Depends(verify_api_key)):
     return {"message": "Hello, World!"}
 
 @router.post("/api/manuals/upload")
@@ -50,6 +50,3 @@ async def ask(request: QuestionRequest, dependencies: dict = Depends(get_depende
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-    
